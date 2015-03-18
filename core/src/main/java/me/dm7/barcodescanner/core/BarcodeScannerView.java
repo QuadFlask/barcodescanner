@@ -1,124 +1,125 @@
 package me.dm7.barcodescanner.core;
 
 import android.content.Context;
-import android.graphics.Point;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.hardware.Camera;
-import android.os.AsyncTask;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.widget.FrameLayout;
+import android.widget.RelativeLayout;
 
-public abstract class BarcodeScannerView extends FrameLayout implements Camera.PreviewCallback  {
-    private Camera mCamera;
-    private CameraPreview mPreview;
-    private ViewFinderView mViewFinderView;
-    private Rect mFramingRectInPreview;
+public abstract class BarcodeScannerView extends FrameLayout implements Camera.PreviewCallback {
+	private Camera mCamera;
+	private CameraPreview mPreview;
+	private ViewFinderView mViewFinderView;
+	private Rect mFramingRectInPreview;
 
-    public BarcodeScannerView(Context context) {
-        super(context);
-        setupLayout();
-    }
+	public BarcodeScannerView(Context context) {
+		super(context);
+		setupLayout();
+	}
 
-    public BarcodeScannerView(Context context, AttributeSet attributeSet) {
-        super(context, attributeSet);
-        setupLayout();
-    }
+	public BarcodeScannerView(Context context, AttributeSet attributeSet) {
+		super(context, attributeSet);
+		setupLayout();
+	}
 
-    public void setupLayout() {
-        mPreview = new CameraPreview(getContext());
-        mViewFinderView = new ViewFinderView(getContext());
-        addView(mPreview);
-        addView(mViewFinderView);
-    }
+	public void setupLayout() {
+		mPreview = new CameraPreview(getContext());
+		mViewFinderView = new ViewFinderView(getContext());
+		RelativeLayout relativeLayout = new RelativeLayout(getContext());
+		relativeLayout.setGravity(Gravity.CENTER);
+		relativeLayout.setBackgroundColor(Color.BLACK);
+		relativeLayout.addView(mPreview);
+		addView(relativeLayout);
 
-    public void startCamera() {
-        mCamera = CameraUtils.getCameraInstance();
-        if(mCamera != null) {
-            mViewFinderView.setupViewFinder();
-            mPreview.setCamera(mCamera, this);
-            mPreview.initCameraPreview();
-        }
-    }
+		addView(mViewFinderView);
+	}
 
-    public void stopCamera() {
-        if(mCamera != null) {
-            mPreview.stopCameraPreview();
-            mPreview.setCamera(null, null);
-            mCamera.release();
-            mCamera = null;
-        }
-    }
+	public void startCamera() {
+		mCamera = CameraUtils.getCameraInstance();
+		if (mCamera != null) {
+			mViewFinderView.setupViewFinder();
+			mPreview.setCamera(mCamera, this);
+			mPreview.initCameraPreview();
+		}
+	}
 
-    public synchronized Rect getFramingRectInPreview(int width, int height) {
-        if (mFramingRectInPreview == null) {
-            Rect framingRect = mViewFinderView.getFramingRect();
-            if (framingRect == null) {
-                return null;
-            }
-            Rect rect = new Rect(framingRect);
-            Point screenResolution = DisplayUtils.getScreenResolution(getContext());
-            Point cameraResolution = new Point(width, height);
+	public void stopCamera() {
+		if (mCamera != null) {
+			mPreview.stopCameraPreview();
+			mPreview.setCamera(null, null);
+			mCamera.release();
+			mCamera = null;
+		}
+	}
 
-            if (cameraResolution == null || screenResolution == null) {
-                // Called early, before init even finished
-                return null;
-            }
+	public synchronized Rect getFramingRectInPreview(int previewWidth, int previewHeight) {
+		if (mFramingRectInPreview == null) {
+			Rect framingRect = mViewFinderView.getFramingRect();
+			int viewFinderViewWidth = mViewFinderView.getWidth();
+			int viewFinderViewHeight = mViewFinderView.getHeight();
+			if (framingRect == null || viewFinderViewWidth == 0 || viewFinderViewHeight == 0) {
+				return null;
+			}
 
-            rect.left = rect.left * cameraResolution.x / screenResolution.x;
-            rect.right = rect.right * cameraResolution.x / screenResolution.x;
-            rect.top = rect.top * cameraResolution.y / screenResolution.y;
-            rect.bottom = rect.bottom * cameraResolution.y / screenResolution.y;
+			Rect rect = new Rect(framingRect);
+			rect.left = rect.left * previewWidth / viewFinderViewWidth;
+			rect.right = rect.right * previewWidth / viewFinderViewWidth;
+			rect.top = rect.top * previewHeight / viewFinderViewHeight;
+			rect.bottom = rect.bottom * previewHeight / viewFinderViewHeight;
 
-            mFramingRectInPreview = rect;
-        }
-        return mFramingRectInPreview;
-    }
+			mFramingRectInPreview = rect;
+		}
+		return mFramingRectInPreview;
+	}
 
-    public void setFlash(boolean flag) {
-        if(mCamera != null && CameraUtils.isFlashSupported(mCamera)) {
-            Camera.Parameters parameters = mCamera.getParameters();
-            if(flag) {
-                if(parameters.getFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH)) {
-                    return;
-                }
-                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
-            } else {
-                if(parameters.getFlashMode().equals(Camera.Parameters.FLASH_MODE_OFF)) {
-                    return;
-                }
-                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
-            }
-            mCamera.setParameters(parameters);
-        }
-    }
+	public void setFlash(boolean flag) {
+		if (mCamera != null && CameraUtils.isFlashSupported(mCamera)) {
+			Camera.Parameters parameters = mCamera.getParameters();
+			if (flag) {
+				if (parameters.getFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH)) {
+					return;
+				}
+				parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+			} else {
+				if (parameters.getFlashMode().equals(Camera.Parameters.FLASH_MODE_OFF)) {
+					return;
+				}
+				parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+			}
+			mCamera.setParameters(parameters);
+		}
+	}
 
-    public boolean getFlash() {
-        if(mCamera != null && CameraUtils.isFlashSupported(mCamera)) {
-            Camera.Parameters parameters = mCamera.getParameters();
-            if(parameters.getFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH)) {
-                return true;
-            } else {
-                return false;
-            }
-        }
-        return false;
-    }
+	public boolean getFlash() {
+		if (mCamera != null && CameraUtils.isFlashSupported(mCamera)) {
+			Camera.Parameters parameters = mCamera.getParameters();
+			if (parameters.getFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH)) {
+				return true;
+			} else {
+				return false;
+			}
+		}
+		return false;
+	}
 
-    public void toggleFlash() {
-        if(mCamera != null && CameraUtils.isFlashSupported(mCamera)) {
-            Camera.Parameters parameters = mCamera.getParameters();
-            if(parameters.getFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH)) {
-                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
-            } else {
-                parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
-            }
-            mCamera.setParameters(parameters);
-        }
-    }
+	public void toggleFlash() {
+		if (mCamera != null && CameraUtils.isFlashSupported(mCamera)) {
+			Camera.Parameters parameters = mCamera.getParameters();
+			if (parameters.getFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH)) {
+				parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+			} else {
+				parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+			}
+			mCamera.setParameters(parameters);
+		}
+	}
 
-    public void setAutoFocus(boolean state) {
-        if(mPreview != null) {
-            mPreview.setAutoFocus(state);
-        }
-    }
+	public void setAutoFocus(boolean state) {
+		if (mPreview != null) {
+			mPreview.setAutoFocus(state);
+		}
+	}
 }
